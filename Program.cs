@@ -1,15 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace DiscordButt
+﻿namespace DiscordButt
 {
-    class Program
+    public class Program
     {
-        static void Main(string[] args)
+        public static void Main(string[] args)
         {
+            Native.SetThreadExecutionState(EXECUTION_STATE.ES_DISPLAY_REQUIRED); // prevent server from sleeping
+            var bot = new DiscordBot();
+            bot.Start();
         }
     }
 }
