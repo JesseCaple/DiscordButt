@@ -8,6 +8,7 @@
     using System.Net;
     using System.Speech.AudioFormat;
     using System.Speech.Synthesis;
+    using System.Threading;
     using System.Threading.Tasks;
     using System.Timers;
     using System.Xml.Linq;
@@ -177,7 +178,7 @@
         private async void OncePerMinute(object sender, ElapsedEventArgs e)
         {
             await this.discord.GetChannel(this.heartbeatChannelId).SendIsTyping();
-            if (this.random.NextDouble() <= .0009)
+            if (this.random.NextDouble() <= .0002)
             {
                 var channel = this.discord.Servers.First().DefaultChannel;
                 var map = new Dictionary<int, string>()
@@ -191,7 +192,7 @@
                 await this.GifCommand(channel, query);
             }
 
-            if (this.random.NextDouble() <= .0001)
+            if (this.random.NextDouble() <= .00005)
             {
                 var percent = this.random.Next(60, 99);
                 var channel = this.discord.Servers.First().DefaultChannel;
@@ -323,9 +324,12 @@
                         using (var web = rsp.GetResponseStream())
                         using (var mem = new MemoryStream())
                         {
+                            int count;
                             await channel.SendMessage("Buffering song...");
-                            int count, block = 96000;
-                            byte[] buffer = new byte[block];
+
+                            var channels = this.discord.GetService<AudioService>().Config.Channels;
+                            var format = new WaveFormat(48000, 16, channels);
+                            var buffer = new byte[format.AverageBytesPerSecond / 50];
                             while (this.playingMusic && (count = web.Read(buffer, 0, buffer.Length)) > 0)
                             {
                                 mem.Write(buffer, 0, count);
@@ -334,17 +338,18 @@
                             mem.Seek(0, SeekOrigin.Begin);
                             await channel.SendMessage($"\r\n{track.Artist}\r\n*{track.Album}*\r\n**{track.Title}**");
                             using (var mp3 = new Mp3FileReader(mem))
-                            using (var wav = WaveFormatConversionStream.CreatePcmStream(mp3))
-                            using (var aligned = new BlockAlignReductionStream(wav))
+                            using (var resampler = new MediaFoundationResampler(mp3, format))
                             {
-                                while (this.playingMusic && (count = aligned.Read(buffer, 0, buffer.Length)) > 0)
+                                resampler.ResamplerQuality = 60;
+                                buffer = new byte[format.AverageBytesPerSecond / 50];
+                                while (this.playingMusic && (count = resampler.Read(buffer, 0, buffer.Length)) > 0)
                                 {
                                     this.audio.Send(buffer, 0, count);
                                 }
                             }
                         }
                     }
-                    catch (Exception ex)
+                    catch (Exception)
                     {
                         await channel.SendMessage($"Guess THIS is the day that the music died.");
                     }
